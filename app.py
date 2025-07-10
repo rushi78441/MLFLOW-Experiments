@@ -4,6 +4,7 @@
 
 import os
 import warnings
+warnings.simplefilter("ignore")
 import sys
 
 import pandas as pd
@@ -53,6 +54,7 @@ if __name__ == "__main__":
     train_y = train[["quality"]]
     test_y = test[["quality"]]
 
+    ## psoitional arguments
     alpha = float(sys.argv[1]) if len(sys.argv) > 1 else 0.5
     l1_ratio = float(sys.argv[2]) if len(sys.argv) > 2 else 0.5
 
