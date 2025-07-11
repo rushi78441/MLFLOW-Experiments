@@ -83,6 +83,6 @@ if __name__ == "__main__":
             sk_model = model,
             artifact_path = "model",
             signature = signature,
-            registered_model_name = "WineQualityModel",
+            await_registration_for=0,  # ⛔ Prevent MLflow 3.x registry feature
             input_example = train_x.iloc[:1]
         )
