@@ -15,15 +15,15 @@ import mlflow
 import mlflow.sklearn
 from mlflow.models import infer_signature
 
+#  Initialize DAGsHub integration (this sets tracking URI and credentials automatically) - for tracking model in remote server
 import dagshub
-
-# 🔧 Initialize DAGsHub integration (this sets tracking URI and credentials automatically) - for tracking model in remote server
 dagshub.init(repo_owner='rushi78441', repo_name='MLFLOW-Experiments', mlflow=True)
 
-# Logging setup
+## set logger configuration
 logging.basicConfig(level=logging.WARN)
 logger = logging.getLogger(__name__)
 
+## model performance evaluations
 def eval_metrics(actual, pred):
     rmse = np.sqrt(mean_squared_error(actual, pred))
     mae = mean_absolute_error(actual, pred)
@@ -34,57 +34,55 @@ if __name__ == "__main__":
     warnings.filterwarnings("ignore")
     np.random.seed(40)
 
-    # 📥 Load dataset
+    # Load dataset
     csv_url = (
         "https://raw.githubusercontent.com/mlflow/mlflow/master/tests/datasets/winequality-red.csv"
     )
+
     try:
         data = pd.read_csv(csv_url, sep=";")
     except Exception as e:
         logger.exception("Unable to download training & test CSV. Error: %s", e)
         sys.exit(1)
 
-    # 🔀 Split into train/test sets
+    # Split into train/test sets
     train, test = train_test_split(data)
     train_x = train.drop(["quality"], axis=1)
     test_x = test.drop(["quality"], axis=1)
     train_y = train[["quality"]]
     test_y = test[["quality"]]
 
-    # ⚙️ Read alpha/l1_ratio from command line or use default sys.argv is positional argument , this refers to cmd command python app.py position1_value(alpha) position2_value(l1)
+    # Read alpha/l1_ratio from command line or use default sys.argv is positional argument , this refers to cmd command python app.py position1_value(alpha) position2_value(l1)
     alpha = float(sys.argv[1]) if len(sys.argv) > 1 else 0.5
     l1_ratio = float(sys.argv[2]) if len(sys.argv) > 2 else 0.5
 
-    # 🚀 Start MLflow run
+
+    ## Start MLflow tracking
+    mlflow.set_experiment("wine-quality-prediction")
     with mlflow.start_run():
         # Train model
-        lr = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42)
-        lr.fit(train_x, train_y)
+        model = ElasticNet(alpha=alpha, l1_ratio=l1_ratio, random_state=42)
+        model.fit(train_x, train_y)
 
-        predicted_qualities = lr.predict(test_x)
-        rmse, mae, r2 = eval_metrics(test_y, predicted_qualities)
+        # Predict
+        predicted_qualities = model.predict(test_x)
 
-        # 📊 Print metrics
-        print(f"Elasticnet model (alpha={alpha}, l1_ratio={l1_ratio}):")
-        print(f"  RMSE: {rmse}")
-        print(f"  MAE: {mae}")
-        print(f"  R2: {r2}")
+        # Evaluate metrics
+        (rmse, mae, r2) = eval_metrics(test_y, predicted_qualities)
 
-        # 📌 Log parameters and metrics
+        # Log parameters
         mlflow.log_param("alpha", alpha)
         mlflow.log_param("l1_ratio", l1_ratio)
         mlflow.log_metric("rmse", rmse)
         mlflow.log_metric("mae", mae)
         mlflow.log_metric("r2", r2)
 
-        # ✅ Infer signature and log model
-        predictions = lr.predict(train_x)
-        signature = infer_signature(train_x, predictions)
-
+        # Log model
+        signature = infer_signature(train_x, predicted_qualities)
         mlflow.sklearn.log_model(
-            sk_model=lr,
-            artifact_path="model",
-            signature=signature,
-            input_example=train_x.iloc[:1]
+            sk_model = model,
+            artifact_path = "model",
+            signature = signature,
+            registered_model_name = "WineQualityModel",
+            input_example = train_x.iloc[:1]
         )
-
